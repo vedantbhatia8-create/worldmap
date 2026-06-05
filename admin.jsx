@@ -14,12 +14,28 @@ function AdminDashboard({ user, onSignOut }) {
   const [users, setUsers] = uS(null);
   const [reviews, setReviews] = uS(null);
   const [banning, setBanning] = uS({});
+  const [refreshing, setRefreshing] = uS(false);
+  const [lastRefresh, setLastRefresh] = uS(null);
+
+  const load = async (silent = false) => {
+    if (!silent) setRefreshing(true);
+    try {
+      const [u, r] = await Promise.all([
+        fetch("/api/users").then(r => r.json()).catch(() => []),
+        fetch("/api/reviews").then(r => r.json()).catch(() => []),
+      ]);
+      setUsers(Array.isArray(u) ? u : []);
+      setReviews(Array.isArray(r) ? r : []);
+      setLastRefresh(new Date());
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   uE(() => {
-    Promise.all([
-      fetch("/api/users").then(r => r.json()).catch(() => []),
-      fetch("/api/reviews").then(r => r.json()).catch(() => []),
-    ]).then(([u, r]) => { setUsers(Array.isArray(u) ? u : []); setReviews(Array.isArray(r) ? r : []); });
+    load();
+    const interval = setInterval(() => load(true), 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const toggleBan = async (email, isBanned) => {
@@ -55,6 +71,10 @@ function AdminDashboard({ user, onSignOut }) {
           </div>
         </div>
         <div className="admin-topbar-right">
+          <button className="admin-refresh-btn" onClick={() => load()} disabled={refreshing} title={lastRefresh ? `Last updated ${lastRefresh.toLocaleTimeString()}` : ""}>
+            <span className={"refresh-ic" + (refreshing ? " spinning" : "")}>↻</span>
+            {lastRefresh && <span className="refresh-time">{lastRefresh.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>}
+          </button>
           <a href="/" className="admin-back-btn">← Back to Map</a>
           <button className="user-badge" onClick={onSignOut} title="Sign out">
             <img src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
