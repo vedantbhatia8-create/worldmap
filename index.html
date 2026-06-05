@@ -187,15 +187,91 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 /* ── Login overlay ── */
 .login-overlay{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(120% 90% at 50% 8%, var(--paper-3), var(--paper) 55%, var(--paper-2))}
-.login-card{display:flex;flex-direction:column;align-items:center;gap:16px;
-  background:var(--paper-3);border:1px solid var(--border);border-radius:28px;
-  padding:48px 52px;box-shadow:var(--shadow);max-width:380px;width:90%;text-align:center}
-.login-logo{margin-bottom:4px}
-.login-title{font-family:var(--serif);font-size:28px;color:var(--ink);letter-spacing:.2px;line-height:1.1}
-.login-sub{font-size:13px;color:var(--ink-faint);letter-spacing:.06em;text-transform:uppercase;margin-top:-6px}
-.login-divider{width:48px;height:1px;background:var(--border);margin:4px 0}
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse 70% 55% at 18% 18%, rgba(232,214,162,.75), transparent),
+    radial-gradient(ellipse 65% 60% at 82% 82%, rgba(218,196,138,.65), transparent),
+    radial-gradient(ellipse 100% 100% at 50% 50%, var(--paper-3), var(--paper-2))}
+.login-vignette{position:absolute;inset:0;pointer-events:none;z-index:0;
+  background:radial-gradient(ellipse 80% 80% at 50% 50%, transparent 38%, rgba(36,30,18,.22))}
+.lm{position:absolute;pointer-events:none;user-select:none;z-index:1}
+.lm-compass{top:4%;left:2%;animation:float1 9s ease-in-out infinite}
+.lm-ship{top:3%;right:2%;animation:float2 12s ease-in-out infinite}
+.lm-balloon{bottom:9%;left:3%;animation:float3 10s ease-in-out infinite;animation-delay:-3.5s}
+.lm-palm{bottom:4%;right:2%;animation:float1 11s ease-in-out infinite;animation-delay:-5s}
+.lm-plane{top:10%;left:36%;animation:drift 16s ease-in-out infinite;animation-delay:-2s}
+.lm-anchor{top:36%;right:3%;animation:float2 13s ease-in-out infinite;animation-delay:-4.5s}
+.lm-scope{bottom:30%;left:1%;animation:float3 14s ease-in-out infinite;animation-delay:-7s}
+@keyframes float1{0%,100%{transform:translateY(0) rotate(0deg)}35%{transform:translateY(-14px) rotate(2.5deg)}70%{transform:translateY(8px) rotate(-1.5deg)}}
+@keyframes float2{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(16px) rotate(-3deg)}}
+@keyframes float3{0%,100%{transform:translateY(0) rotate(0deg)}40%{transform:translateY(-10px) rotate(4deg)}72%{transform:translateY(7px) rotate(-2.5deg)}}
+@keyframes drift{0%,100%{transform:translateX(0)}50%{transform:translateX(28px)}}
+@keyframes twinkle{0%,100%{opacity:.38;transform:scale(1)}50%{opacity:.7;transform:scale(1.2)}}
+
+.login-card{position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;
+  background:rgba(248,240,217,.97);border:1px solid rgba(182,146,59,.5);border-radius:28px;
+  padding:50px 54px;box-shadow:0 24px 60px -20px rgba(58,51,34,.45),0 0 0 1px rgba(182,146,59,.15);
+  max-width:390px;width:90%;text-align:center;z-index:2;
+  backdrop-filter:blur(8px)}
+/* Corner ornaments */
+.lcc{position:absolute;width:24px;height:24px;border-color:rgba(182,146,59,.5);border-style:solid}
+.lcc-tl{top:14px;left:14px;border-width:2px 0 0 2px;border-radius:2px 0 0 0}
+.lcc-tr{top:14px;right:14px;border-width:2px 2px 0 0;border-radius:0 2px 0 0}
+.lcc-bl{bottom:14px;left:14px;border-width:0 0 2px 2px;border-radius:0 0 0 2px}
+.lcc-br{bottom:14px;right:14px;border-width:0 2px 2px 0;border-radius:0 0 2px 0}
+.login-logo{margin-bottom:2px}
+.login-title{font-family:var(--serif);font-size:29px;color:var(--ink);letter-spacing:.3px;line-height:1.1}
+.login-sub{font-size:12.5px;color:var(--ink-faint);letter-spacing:.1em;text-transform:uppercase;margin-top:-4px}
+.login-ornament{margin:2px 0 4px;display:flex;align-items:center;justify-content:center}
 .login-error{font-size:12.5px;color:var(--terra);margin-top:4px}
+
+/* ── Map canvas vintage filter ── */
+.map-canvas{filter:sepia(18%) saturate(88%) hue-rotate(-4deg) brightness(97%)}
+
+/* ── Admin button ── */
+.admin-btn{font-family:var(--sans);font-size:12.5px;font-weight:600;letter-spacing:.06em;
+  text-transform:uppercase;text-decoration:none;color:var(--ink-soft);
+  background:rgba(247,241,224,.92);border:1px solid var(--border);border-radius:20px;
+  padding:8px 16px;transition:background .15s,color .15s;white-space:nowrap}
+.admin-btn:hover{background:var(--paper-3);color:var(--ink)}
+
+/* ── Admin page ── */
+.admin-page{min-height:100vh;background:var(--paper);display:flex;flex-direction:column}
+.admin-topbar{display:flex;align-items:center;justify-content:space-between;gap:20px;
+  padding:20px 32px;background:rgba(243,230,196,.98);border-bottom:1px solid var(--rule);
+  position:sticky;top:0;z-index:100}
+.admin-topbar-right{display:flex;align-items:center;gap:16px}
+.admin-back-btn{font-size:13.5px;font-weight:500;color:var(--ink-soft);text-decoration:none;
+  padding:8px 16px;border:1px solid var(--rule);border-radius:20px;background:transparent;
+  transition:background .15s,color .15s}
+.admin-back-btn:hover{background:var(--paper-3);color:var(--ink)}
+.admin-main{max-width:900px;width:100%;margin:0 auto;padding:48px 32px 80px}
+.admin-hero{margin-bottom:52px}
+.admin-hero-tag{display:inline-block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--terra);font-weight:600;margin-bottom:10px}
+.admin-hero-title{font-family:var(--serif);font-size:46px;color:var(--ink);letter-spacing:.3px;line-height:1;margin-bottom:10px}
+.admin-hero-sub{font-size:16px;color:var(--ink-soft)}
+.admin-section{margin-bottom:52px}
+.admin-section-title{font-family:var(--serif);font-size:20px;color:var(--ink);margin-bottom:20px;
+  padding-bottom:10px;border-bottom:1px solid var(--rule-soft)}
+.admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.admin-card{background:var(--paper-3);border:1px solid var(--rule-soft);border-radius:18px;
+  padding:22px 22px 20px;display:flex;flex-direction:column;gap:10px;
+  box-shadow:0 4px 16px -10px rgba(58,51,34,.25)}
+.admin-card-ic{font-size:26px;line-height:1}
+.admin-card h3{font-family:var(--serif);font-size:17px;color:var(--ink)}
+.admin-stat{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:#fff;background:var(--teal);border-radius:20px;padding:3px 10px}
+.admin-card p{font-size:12.5px;color:var(--ink-faint);line-height:1.45}
+.admin-profile{display:flex;align-items:center;gap:22px;background:var(--paper-3);
+  border:1px solid var(--rule-soft);border-radius:18px;padding:28px 28px;
+  box-shadow:0 4px 16px -10px rgba(58,51,34,.25)}
+.admin-avatar{width:70px;height:70px;border-radius:50%;border:2px solid var(--border);flex:none;object-fit:cover}
+.admin-profile-name{font-family:var(--serif);font-size:20px;color:var(--ink);margin-bottom:4px}
+.admin-profile-email{font-size:13.5px;color:var(--ink-soft);margin-bottom:10px}
+.admin-role-badge{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--terra);background:rgba(203,86,31,.1);border:1px solid rgba(203,86,31,.25);
+  border-radius:12px;padding:4px 12px}
 
 /* Skeletons */
 .skel-box{background:var(--paper-2)}
@@ -217,6 +293,7 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script type="text/babel" src="auth.jsx"></script>
+<script type="text/babel" src="admin.jsx"></script>
 <script type="text/babel" src="cities.jsx"></script>
 <script type="text/babel" src="ai.jsx"></script>
 <script type="text/babel" src="worldmap.jsx"></script>

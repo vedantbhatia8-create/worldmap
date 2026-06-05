@@ -130,9 +130,15 @@ function App() {
 
   uE(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
 
+  const signOut = () => { localStorage.removeItem("dr_user"); setUser(null); };
+
   if (!user) return <LoginScreen onLogin={setUser} />;
 
-  const signOut = () => { localStorage.removeItem("dr_user"); setUser(null); };
+  const isAdmin = user.email === "vedantbhatia8@gmail.com";
+  if (window.location.pathname === "/admin") {
+    if (!isAdmin) { window.location.replace("/"); return null; }
+    return <AdminDashboard user={user} onSignOut={signOut} />;
+  }
 
   return (
     <div className={"app" + (place ? " has-panel" : "")}>
@@ -150,6 +156,7 @@ function App() {
             </div>
           </div>
           <SearchBox onSelect={pick} />
+          {isAdmin && <a href="/admin" className="admin-btn" title="Admin dashboard">Admin</a>}
           <button className="user-badge" onClick={signOut} title={`Sign out (${user.email})`}>
             <img src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
           </button>
