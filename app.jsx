@@ -81,6 +81,9 @@ function SearchBox({ onSelect }) {
 }
 
 function App() {
+  const [user, setUser] = uS(() => {
+    try { return JSON.parse(localStorage.getItem("dr_user")); } catch { return null; }
+  });
   const [place, setPlace] = uS(null);
   const [data, setData] = uS(null);
   const [loading, setLoading] = uS(false);
@@ -127,6 +130,10 @@ function App() {
 
   uE(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
 
+  if (!user) return <LoginScreen onLogin={setUser} />;
+
+  const signOut = () => { localStorage.removeItem("dr_user"); setUser(null); };
+
   return (
     <div className={"app" + (place ? " has-panel" : "")}>
       <div className="stage">
@@ -143,6 +150,9 @@ function App() {
             </div>
           </div>
           <SearchBox onSelect={pick} />
+          <button className="user-badge" onClick={signOut} title={`Sign out (${user.email})`}>
+            <img src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
+          </button>
         </header>
 
         <WorldMap onPick={pick} selected={place} picking={resolving} />
