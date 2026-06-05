@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Hanken+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
 :root{
   --paper:#F3E6C4; --paper-2:#EFDFB6; --paper-3:#F8F0D9;
@@ -83,6 +84,18 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 
 .compass{position:absolute;left:22px;bottom:20px;opacity:.9;pointer-events:none}
 .compass-n{font-family:var(--serif);font-size:13px;fill:var(--pin)}
+
+/* ── Leaflet overrides ── */
+.map-canvas{width:100%;height:100%}
+.leaflet-container{cursor:crosshair;font-family:var(--sans)}
+.leaflet-container.picking{cursor:progress}
+.leaflet-container:active{cursor:grabbing}
+.leaflet-attribution-flag{display:none!important}
+.pin-icon{background:none!important;border:none!important;display:flex;align-items:flex-end;position:relative}
+.pin-pulse{position:absolute;top:-4px;left:50%;transform:translateX(-50%);
+  width:34px;height:34px;border-radius:50%;background:rgba(192,57,43,.22);
+  animation:pulse 2.4s ease-out infinite;pointer-events:none}
+@keyframes pulse{0%{transform:translateX(-50%) scale(.3);opacity:.8}70%{opacity:0}100%{transform:translateX(-50%) scale(1.5);opacity:0}}
 
 .hint{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);z-index:10;
   background:rgba(247,241,224,.94);border:1px solid var(--border);border-radius:22px;padding:10px 20px;
@@ -179,11 +192,24 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 <body>
 <div id="root"></div>
 
+<script>
+window.claude = {
+  async complete({ messages }) {
+    const res = await fetch("/api/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages }),
+    });
+    if (!res.ok) throw new Error("API error " + res.status);
+    const data = await res.json();
+    return data.text;
+  },
+};
+</script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script type="text/babel" src="cities.jsx"></script>
 <script type="text/babel" src="ai.jsx"></script>

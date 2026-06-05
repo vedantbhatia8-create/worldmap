@@ -1,5 +1,5 @@
 // ── App: state, data loading, search, AI wiring ──────────────────────────────
-const { useState: uS, useEffect: uE, useRef: uR, useMemo: uM } = React;
+const { useState: uS, useEffect: uE, useRef: uR } = React;
 
 function fmtCoords(lat, lon) {
   const la = `${Math.abs(lat).toFixed(2)}°${lat >= 0 ? "N" : "S"}`;
@@ -11,15 +11,32 @@ function SearchBox({ onSelect }) {
   const [q, setQ] = uS("");
   const [open, setOpen] = uS(false);
   const [hi, setHi] = uS(0);
+  const [matches, setMatches] = uS([]);
   const boxRef = uR(null);
+  const timerRef = uR(null);
 
-  const matches = uM(() => {
-    if (!q.trim()) return [];
-    const s = q.trim().toLowerCase();
-    return window.CITIES
-      .filter((c) => (c.name + " " + c.country).toLowerCase().includes(s))
-      .sort((a, b) => (a.name.toLowerCase().startsWith(s) ? -1 : 1))
-      .slice(0, 6);
+  uE(() => {
+    if (!q.trim()) { setMatches([]); return; }
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(
+          `https://photon.komoot.io/api/?q=${encodeURIComponent(q.trim())}&limit=6&lang=en`
+        );
+        const d = await r.json();
+        const results = (d.features || [])
+          .filter((f) => f.properties.name)
+          .map((f) => ({
+            name: f.properties.name,
+            country: f.properties.country || "",
+            lat: f.geometry.coordinates[1],
+            lon: f.geometry.coordinates[0],
+          }));
+        setMatches(results);
+        setOpen(true);
+      } catch { setMatches([]); }
+    }, 300);
+    return () => clearTimeout(timerRef.current);
   }, [q]);
 
   uE(() => {
@@ -38,8 +55,8 @@ function SearchBox({ onSelect }) {
       <input
         value={q}
         placeholder="Search a city or destination…"
-        onChange={(e) => { setQ(e.target.value); setOpen(true); setHi(0); }}
-        onFocus={() => setOpen(true)}
+        onChange={(e) => { setQ(e.target.value); setHi(0); }}
+        onFocus={() => matches.length && setOpen(true)}
         onKeyDown={(e) => {
           if (!matches.length) return;
           if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => (h + 1) % matches.length); }
@@ -51,7 +68,7 @@ function SearchBox({ onSelect }) {
       {open && matches.length > 0 && (
         <ul className="ac">
           {matches.map((c, i) => (
-            <li key={c.name} className={"ac-item" + (i === hi ? " hi" : "")}
+            <li key={`${c.name}-${c.lat}`} className={"ac-item" + (i === hi ? " hi" : "")}
               onMouseEnter={() => setHi(i)} onMouseDown={(e) => { e.preventDefault(); choose(c); }}>
               <span className="ac-name">{c.name}</span>
               <span className="ac-country">{c.country}</span>
@@ -64,7 +81,6 @@ function SearchBox({ onSelect }) {
 }
 
 function App() {
-  const [countries, setCountries] = uS([]);
   const [place, setPlace] = uS(null);
   const [data, setData] = uS(null);
   const [loading, setLoading] = uS({ food: false, attractions: false });
@@ -73,30 +89,18 @@ function App() {
   const [toast, setToast] = uS(null);
   const reqId = uR(0);
 
-  // Load world topology.
-  uE(() => {
-    fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json")
-      .then((r) => r.json())
-      .then((topo) => {
-        const fc = topojson.feature(topo, topo.objects.countries);
-        setCountries(fc.features.filter((f) => f.id !== "010")); // drop Antarctica
-      })
-      .catch(() => setToast("Couldn’t load the map data."));
-  }, []);
-
   const loadLists = async (placeObj) => {
     const id = ++reqId.current;
     setData({ food: null, attractions: null });
     setLoading({ food: true, attractions: true });
     const label = `${placeObj.name}, ${placeObj.country}`;
-    // Both tabs in parallel; each settles independently.
     const settle = (kind, val) => {
       if (id !== reqId.current) return;
       setData((d) => ({ ...(d || {}), [kind]: val }));
       setLoading((l) => ({ ...l, [kind]: false }));
     };
     window.DRAI.generateList(label, "food").then((v) => settle("food", v))
-      .catch(() => { settle("food", []); setToast("Couldn’t reach the guide service."); });
+      .catch(() => { settle("food", []); setToast("Couldn't reach the guide service."); });
     window.DRAI.generateList(label, "attractions").then((v) => settle("attractions", v))
       .catch(() => settle("attractions", []));
   };
@@ -136,15 +140,11 @@ function App() {
           <SearchBox onSelect={pick} />
         </header>
 
-        {countries.length === 0 ? (
-          <div className="loading-map"><span className="lm-dot" /> Unrolling the map…</div>
-        ) : (
-          <WorldMap countries={countries} onPick={pick} selected={place} picking={resolving} />
-        )}
+        <WorldMap onPick={pick} selected={place} picking={resolving} />
 
-        {!place && countries.length > 0 && (
+        {!place && (
           <div className="hint">
-            <span className="hint-k">Click the map</span>, search, or tap a <span className="hint-pin" /> to begin
+            <span className="hint-k">Click the map</span> or search a destination to begin
           </div>
         )}
 
