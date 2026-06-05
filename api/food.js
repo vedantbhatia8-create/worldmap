@@ -36,17 +36,21 @@ async function fromGemini(place) {
   const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 1024 } });
   const key = process.env.GEMINI_API_KEY;
 
-  // Try models in order until one responds successfully.
-  const endpoints = [
-    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`,
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${key}`,
+  // Try bearer-token auth (newer AQ. keys) then query-param auth (classic AIza keys),
+  // across multiple models, until one responds successfully.
+  const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-pro"];
+  const attempts = [
+    ...models.map(m => ({ url: `https://generativelanguage.googleapis.com/v1/models/${m}:generateContent`, auth: "bearer" })),
+    ...models.map(m => ({ url: `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, auth: "bearer" })),
+    ...models.map(m => ({ url: `https://generativelanguage.googleapis.com/v1/models/${m}:generateContent?key=${key}`, auth: "param" })),
+    ...models.map(m => ({ url: `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`, auth: "param" })),
   ];
 
   let lastErr = "All Gemini endpoints failed";
-  for (const url of endpoints) {
-    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+  for (const { url, auth } of attempts) {
+    const headers = { "Content-Type": "application/json" };
+    if (auth === "bearer") headers["Authorization"] = `Bearer ${key}`;
+    const r = await fetch(url, { method: "POST", headers, body });
     const data = await r.json();
     if (!r.ok || data.error) { lastErr = data.error?.message || `HTTP ${r.status}`; continue; }
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
