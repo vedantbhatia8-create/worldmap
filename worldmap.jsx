@@ -30,7 +30,12 @@ function WorldMap({ onPick, selected, picking }) {
     });
 
     mapRef.current = map;
-    return () => { map.remove(); mapRef.current = null; markerRef.current = null; };
+
+    // Fix Leaflet miscalculating size before CSS layout is settled.
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    ro.observe(containerRef.current);
+
+    return () => { ro.disconnect(); map.remove(); mapRef.current = null; markerRef.current = null; };
   }, []);
 
   // Fly to selected place and drop marker.
