@@ -171,7 +171,10 @@ function AdminDashboard({ user, onSignOut }) {
                 {reviews.slice(0, 30).map(r => (
                   <div key={r.id} className="admin-review-item">
                     <div className="ari-header">
-                      <span className="ari-place">{r.place_name}</span>
+                      <span className="ari-place">
+                        {r.place_name}
+                        {r.place_country && <span className="ari-city"> · {r.place_country}</span>}
+                      </span>
                       <span className="ari-stars">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
                       <span className="ari-date">{fmtDate(r.created_at)}</span>
                     </div>

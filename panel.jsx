@@ -13,8 +13,8 @@ function Stars({ value }) {
             <stop offset={pct + "%"} stopColor="#D8CBA8" />
           </linearGradient>
         </defs>
-        {[0, 1, 2, 3, 4].map((i) => (
-          <path key={i} d={star} transform={`translate(${i * 20},0)`} fill={`url(#sg${pct.toFixed(0)})`} />
+        {[0,1,2,3,4].map(i => (
+          <path key={i} d={star} transform={`translate(${i*20},0)`} fill={`url(#sg${pct.toFixed(0)})`} />
         ))}
       </svg>
       <span className="stars-num">{value.toFixed(1)}</span>
@@ -48,39 +48,6 @@ function Thumb({ item }) {
   );
 }
 
-function ResultItem({ item }) {
-  return (
-    <li className="ritem">
-      <Thumb item={item} />
-      <div className="ritem-body">
-        <h4 className="ritem-name">{item.name}</h4>
-        <div className="ritem-cat">{item.category}</div>
-        <div className="ritem-meta">
-          <Stars value={item.rating} />
-          <span className="dot-sep">·</span>
-          <PriceLevel value={item.price} />
-          {item.distance && (<><span className="dot-sep">·</span><span className="dist">{item.distance}</span></>)}
-        </div>
-        {item.blurb && <p className="ritem-blurb">{item.blurb}</p>}
-      </div>
-    </li>
-  );
-}
-
-function SkeletonItem() {
-  return (
-    <li className="ritem skel">
-      <div className="thumb skel-box" />
-      <div className="ritem-body">
-        <div className="skel-line w60" />
-        <div className="skel-line w35" />
-        <div className="skel-line w50" />
-        <div className="skel-line w80" />
-      </div>
-    </li>
-  );
-}
-
 function fmtReviewDate(iso) {
   if (!iso) return "";
   const d = new Date(iso), diff = Date.now() - d;
@@ -91,7 +58,7 @@ function fmtReviewDate(iso) {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function ReviewSection({ place, user }) {
+function RestaurantReviews({ item, place, user }) {
   const [reviews, setReviews] = uS(null);
   const [hov, setHov] = uS(0);
   const [sel, setSel] = uS(0);
@@ -100,79 +67,123 @@ function ReviewSection({ place, user }) {
   const [done, setDone] = uS(false);
 
   uE(() => {
-    if (!place) return;
-    setReviews(null); setDone(false); setSel(0); setText("");
-    fetch(`/api/reviews?place=${encodeURIComponent(place.name)}`)
+    fetch(`/api/reviews?restaurant=${encodeURIComponent(item.name)}&place=${encodeURIComponent(place.name)}`)
       .then(r => r.json()).then(setReviews).catch(() => setReviews([]));
-  }, [place?.name]);
+  }, [item.name, place.name]);
 
   const submit = async () => {
-    if (!sel || busy) return;
+    if (busy) return;
     setBusy(true);
     try {
       await fetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          place_name: place.name, place_country: place.country,
-          user_email: user.email, user_name: user.name,
-          rating: sel, review_text: text.trim(),
+          restaurant_name: item.name,
+          city_name: place.name,
+          user_email: user.email,
+          user_name: user.name,
+          rating: sel || 5,
+          review_text: text.trim(),
         }),
       });
-      setDone(true); setSel(0); setText("");
-      const fresh = await fetch(`/api/reviews?place=${encodeURIComponent(place.name)}`).then(r => r.json());
-      setReviews(fresh);
+      setDone(true);
+      const fresh = await fetch(`/api/reviews?restaurant=${encodeURIComponent(item.name)}&place=${encodeURIComponent(place.name)}`).then(r => r.json());
+      setReviews(Array.isArray(fresh) ? fresh : []);
     } finally { setBusy(false); }
   };
 
   const active = hov || sel;
 
   return (
-    <div className="review-section">
-      <div className="review-section-title">Community Reviews</div>
+    <div className="rr-panel">
+      {reviews === null && <div className="rr-loading">Loading reviews…</div>}
 
       {reviews && reviews.length > 0 && (
-        <div className="review-list">
+        <div className="rr-list">
           {reviews.map(r => (
-            <div key={r.id} className="review-item">
-              <div className="ri-header">
-                <span className="ri-stars">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
-                <span className="ri-user">{r.user_name}</span>
-                <span className="ri-date">{fmtReviewDate(r.created_at)}</span>
+            <div key={r.id} className="rr-item">
+              <div className="rr-item-header">
+                <span className="rr-stars">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
+                <span className="rr-user">{r.user_name}</span>
+                <span className="rr-date">{fmtReviewDate(r.created_at)}</span>
               </div>
-              {r.review_text && <p className="ri-text">{r.review_text}</p>}
+              {r.review_text && <p className="rr-text">{r.review_text}</p>}
             </div>
           ))}
         </div>
       )}
-      {reviews && reviews.length === 0 && (
-        <p className="review-empty">No reviews yet — be the first!</p>
+
+      {reviews && reviews.length === 0 && !done && (
+        <p className="rr-empty">No reviews yet — be the first!</p>
       )}
 
       {!done ? (
-        <div className="review-form">
-          <div className="rf-label">Leave a review</div>
-          <div className="rf-stars">
-            {[1, 2, 3, 4, 5].map(n => (
-              <button key={n} className={"rf-star" + (n <= active ? " lit" : "")}
+        <div className="rr-form">
+          <div className="rrf-label">Your rating</div>
+          <div className="rrf-stars">
+            {[1,2,3,4,5].map(n => (
+              <button key={n} className={"rrf-star" + (n <= active ? " lit" : "")}
                 onMouseEnter={() => setHov(n)} onMouseLeave={() => setHov(0)}
                 onClick={() => setSel(n)}>★</button>
             ))}
+            {sel > 0 && <span className="rrf-sel-label">{["","Poor","Fair","Good","Great","Excellent"][sel]}</span>}
           </div>
-          {sel > 0 && (
-            <>
-              <textarea className="rf-text" placeholder="Share your experience… (optional)"
-                value={text} onChange={e => setText(e.target.value)} rows={3} />
-              <button className="rf-submit" onClick={submit} disabled={busy}>
-                {busy ? "Submitting…" : "Submit Review"}
-              </button>
-            </>
-          )}
+          <textarea className="rrf-text" placeholder="Describe your experience… (optional)"
+            value={text} onChange={e => setText(e.target.value)} rows={3} />
+          <button className="rrf-submit" onClick={submit} disabled={busy || (!sel && !text.trim())}>
+            {busy ? "Submitting…" : "Submit Review"}
+          </button>
         </div>
       ) : (
-        <div className="review-thanks">Thanks for your review! ✦</div>
+        <div className="rr-thanks">Thanks for your review! ✦</div>
       )}
     </div>
+  );
+}
+
+function ResultItem({ item, place, user }) {
+  const [open, setOpen] = uS(false);
+
+  return (
+    <li className={"ritem" + (open ? " ritem-open" : "")}>
+      <div className="ritem-main">
+        <Thumb item={item} />
+        <div className="ritem-body">
+          <h4 className="ritem-name">{item.name}</h4>
+          <div className="ritem-cat">{item.category}</div>
+          <div className="ritem-meta">
+            <Stars value={item.rating} />
+            <span className="dot-sep">·</span>
+            <PriceLevel value={item.price} />
+            {item.distance && (<><span className="dot-sep">·</span><span className="dist">{item.distance}</span></>)}
+          </div>
+          {item.blurb && <p className="ritem-blurb">{item.blurb}</p>}
+          {user && (
+            <button className="ritem-review-btn" onClick={() => setOpen(o => !o)}>
+              {open ? "▲ Hide" : "★ Reviews & Rate"}
+            </button>
+          )}
+        </div>
+      </div>
+      {open && <RestaurantReviews item={item} place={place} user={user} />}
+    </li>
+  );
+}
+
+function SkeletonItem() {
+  return (
+    <li className="ritem skel">
+      <div className="ritem-main">
+        <div className="thumb skel-box" />
+        <div className="ritem-body">
+          <div className="skel-line w60" />
+          <div className="skel-line w35" />
+          <div className="skel-line w50" />
+          <div className="skel-line w80" />
+        </div>
+      </div>
+    </li>
   );
 }
 
@@ -188,12 +199,11 @@ function ResultsPanel({ place, data, loading, onClose, user }) {
             <h2 className="panel-title">{place.name}</h2>
             <div className="panel-sub">{place.country}{place.coords ? ` · ${place.coords}` : ""}</div>
           </div>
-
           <div className="panel-scroll">
             <div className="list-cap">Top 10 · where to eat &amp; drink</div>
             <ol className="rlist">
               {loading && Array.from({ length: 7 }).map((_, i) => <SkeletonItem key={i} />)}
-              {!loading && data && data.map((it) => <ResultItem key={it.rank} item={it} />)}
+              {!loading && data && data.map(it => <ResultItem key={it.rank} item={it} place={place} user={user} />)}
               {!loading && data && data.length === 0 && (
                 <div className="panel-empty">No results found — try a larger nearby city.</div>
               )}
@@ -201,8 +211,6 @@ function ResultsPanel({ place, data, loading, onClose, user }) {
             {!loading && data && data.length > 0 && (
               <div className="panel-foot">Top restaurants &amp; bars in {place.name}</div>
             )}
-
-            {user && <ReviewSection place={place} user={user} />}
           </div>
         </div>
       )}
