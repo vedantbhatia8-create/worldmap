@@ -27,48 +27,34 @@ async function fromYelp(place) {
   }));
 }
 
-async function fromAI(place) {
+async function fromGroq(place) {
   const prompt =
     `For "${place}", list the 10 best restaurants, cafes, bars and food spots.\n` +
     `Reply with ONLY a raw JSON array of 10 objects, no prose:\n` +
     `{"name":"string","category":"2-3 word type","rating":4.6,"price":2,"distance":"1.2 km","blurb":"max 12 words"}\n` +
     `rating: 3.8-5.0, price: 1-4 (1=cheap, 4=fine dining), distance from city centre.`;
 
-  if (process.env.OPENROUTER_API_KEY) {
-    // Fetch currently available free models dynamically — no stale hardcoded list.
-    const modelsRes = await fetch("https://openrouter.ai/api/v1/models");
-    const modelsData = await modelsRes.json();
-    const freeModels = (modelsData.data || [])
-      .filter(m => m.pricing?.prompt === "0" && m.pricing?.completion === "0")
-      .map(m => m.id)
-      .slice(0, 8);
+  const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 1024,
+      temperature: 0.7,
+    }),
+  });
 
-    if (!freeModels.length) throw new Error("No free models available on OpenRouter right now");
+  const data = await r.json();
+  if (!r.ok || data.error) throw new Error(data.error?.message || `Groq error ${r.status}`);
 
-    let lastErr = "";
-    for (const model of freeModels) {
-      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        },
-        body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 1024 }),
-      });
-      const data = await r.json();
-      if (!r.ok || data.error) { lastErr = data.error?.message || `HTTP ${r.status}`; continue; }
-      const text = data.choices?.[0]?.message?.content || "";
-      const list = safeParseJSON(text);
-      if (Array.isArray(list) && list.length > 0) return normalise(list);
-      lastErr = "Model returned unexpected format: " + model;
-    }
-    throw new Error(lastErr || "All free OpenRouter models failed");
-  }
+  const text = data.choices?.[0]?.message?.content || "";
+  const list = safeParseJSON(text);
+  if (!Array.isArray(list) || !list.length) throw new Error("Unexpected response format from Groq");
 
-  throw new Error("No AI API key configured. Add OPENROUTER_API_KEY in Vercel environment variables.");
-}
-
-function normalise(list) {
   return list.slice(0, 10).map((it, i) => ({
     rank: i + 1,
     name: String(it.name || ""),
@@ -90,7 +76,10 @@ module.exports = async function handler(req, res) {
       const list = await fromYelp(place);
       if (list.length >= 3) return res.json(list);
     }
-    return res.json(await fromAI(place));
+    if (process.env.GROQ_API_KEY) {
+      return res.json(await fromGroq(place));
+    }
+    res.status(500).json({ error: "No API key configured. Add GROQ_API_KEY in Vercel environment variables." });
   } catch (err) {
     console.error("Food API error:", err.message);
     res.status(500).json({ error: err.message });
