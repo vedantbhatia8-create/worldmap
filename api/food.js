@@ -34,35 +34,35 @@ async function fromAI(place) {
     `{"name":"string","category":"2-3 word type","rating":4.6,"price":2,"distance":"1.2 km","blurb":"max 12 words"}\n` +
     `rating: 3.8-5.0, price: 1-4 (1=cheap, 4=fine dining), distance from city centre.`;
 
-  let r, data;
-
   if (process.env.OPENROUTER_API_KEY) {
-    const freeModels = [
-      "google/gemma-2-9b-it:free",
-      "meta-llama/llama-3.2-3b-instruct:free",
-      "mistralai/mistral-7b-instruct:free",
-      "qwen/qwen-2-7b-instruct:free",
-      "meta-llama/llama-3.1-8b-instruct:free",
-    ];
+    // Fetch currently available free models dynamically — no stale hardcoded list.
+    const modelsRes = await fetch("https://openrouter.ai/api/v1/models");
+    const modelsData = await modelsRes.json();
+    const freeModels = (modelsData.data || [])
+      .filter(m => m.pricing?.prompt === "0" && m.pricing?.completion === "0")
+      .map(m => m.id)
+      .slice(0, 8);
+
+    if (!freeModels.length) throw new Error("No free models available on OpenRouter right now");
+
     let lastErr = "";
     for (const model of freeModels) {
-      r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "HTTP-Referer": "https://destination-relaxation.vercel.app",
         },
         body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 1024 }),
       });
-      data = await r.json();
+      const data = await r.json();
       if (!r.ok || data.error) { lastErr = data.error?.message || `HTTP ${r.status}`; continue; }
       const text = data.choices?.[0]?.message?.content || "";
       const list = safeParseJSON(text);
-      if (Array.isArray(list)) return normalise(list);
-      lastErr = "Unexpected format from " + model;
+      if (Array.isArray(list) && list.length > 0) return normalise(list);
+      lastErr = "Model returned unexpected format: " + model;
     }
-    throw new Error(lastErr || "All OpenRouter models failed");
+    throw new Error(lastErr || "All free OpenRouter models failed");
   }
 
   throw new Error("No AI API key configured. Add OPENROUTER_API_KEY in Vercel environment variables.");
