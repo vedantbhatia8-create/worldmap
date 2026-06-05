@@ -1,35 +1,37 @@
-// ── Live AI generation via window.claude.complete ────────────────────────────
-// Output is capped at 1024 tokens, so we keep each call to one short JSON list.
+// ── AI / geocoding helpers ────────────────────────────────────────────────────
 
-const aiCache = {}; // key -> { food?, attractions?, place? }
+const aiCache = {};
 
 function safeParseJSON(text) {
   if (!text) return null;
-  // Strip code fences / leading prose, grab the first {...} or [...] block.
-  let t = String(text).trim();
-  t = t.replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-  const firstBrace = t.search(/[\[{]/);
-  if (firstBrace > 0) t = t.slice(firstBrace);
+  let t = String(text).trim()
+    .replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  const first = t.search(/[\[{]/);
+  if (first > 0) t = t.slice(first);
   try { return JSON.parse(t); } catch (e) {}
-  // Try to recover a top-level array.
   const arr = t.match(/\[[\s\S]*\]/);
   if (arr) { try { return JSON.parse(arr[0]); } catch (e) {} }
   return null;
 }
 
-// Identify a place name from coordinates (for free-form map clicks).
+// Free reverse geocoding via Nominatim — no API key needed.
 async function identifyPlace(lat, lon) {
-  const prompt =
-    `These are latitude/longitude coordinates on Earth: lat ${lat.toFixed(3)}, lon ${lon.toFixed(3)}.\n` +
-    `Name the single nearest well-known travel destination (city or town) to these coordinates.\n` +
-    `Reply with ONLY raw JSON, no prose: {"name":"City","country":"Country","sea":false}\n` +
-    `If the coordinates fall in open ocean far from land, set "sea" to true.`;
   try {
-    const raw = await window.claude.complete({ messages: [{ role: "user", content: prompt }] });
-    const obj = safeParseJSON(raw);
-    if (obj && obj.name) return obj;
-  } catch (e) {}
-  return null;
+    const r = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`,
+      { headers: { "Accept-Language": "en", "User-Agent": "DestinationRelaxation/1.0" } }
+    );
+    const d = await r.json();
+    if (!d || d.error) return { sea: true };
+    const name =
+      d.address?.city ||
+      d.address?.town ||
+      d.address?.village ||
+      d.address?.county ||
+      d.name;
+    if (!name) return { sea: true };
+    return { name, country: d.address?.country || "", sea: false };
+  } catch { return null; }
 }
 
 // Generate a top-10 list for a place. kind = "food" | "attractions".
