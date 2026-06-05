@@ -187,6 +187,11 @@ function LoginScreen({ onLogin }) {
             if (!payload) { setError("Sign-in failed. Please try again."); return; }
             const user = { name: payload.name, email: payload.email, picture: payload.picture };
             localStorage.setItem("dr_user", JSON.stringify(user));
+            fetch("/api/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(user),
+            }).catch(() => {});
             onLogin(user);
           },
           ux_mode: "popup",

@@ -1,12 +1,27 @@
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
+const { useState: uS, useEffect: uE } = React;
 
 function AdminDashboard({ user, onSignOut }) {
+  const [users, setUsers] = uS(null);
+
+  uE(() => {
+    fetch("/api/users")
+      .then(r => r.json())
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  }, []);
+
   const cards = [
     { ic: "🌍", title: "Destinations", stat: "Live", desc: "Photon geocoding + Nominatim reverse lookup" },
     { ic: "🍽", title: "Food Recs", stat: "AI-Powered", desc: "Llama 3.1 via Groq API (with Yelp fallback)" },
-    { ic: "🔐", title: "Authentication", stat: "Active", desc: "Google Identity Services OAuth 2.0" },
+    { ic: "🔐", title: "Auth", stat: "Active", desc: "Google Identity Services OAuth 2.0" },
     { ic: "🗺", title: "Map Tiles", stat: "Live", desc: "Esri National Geographic + Leaflet.js" },
   ];
+
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  }
 
   return (
     <div className="admin-page">
@@ -51,6 +66,48 @@ function AdminDashboard({ user, onSignOut }) {
               </div>
             ))}
           </div>
+        </section>
+
+        <section className="admin-section">
+          <h2 className="admin-section-title">
+            Users
+            {users && <span className="admin-user-count">{users.length} total</span>}
+          </h2>
+          {!users && <div className="admin-loading">Loading users…</div>}
+          {users && users.length === 0 && (
+            <div className="admin-empty">No users yet — sign in on the map to populate this table.</div>
+          )}
+          {users && users.length > 0 && (
+            <div className="admin-table-wrap">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Email</th>
+                    <th>Visits</th>
+                    <th>First seen</th>
+                    <th>Last seen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.email}>
+                      <td>
+                        <div className="admin-table-user">
+                          {u.picture && <img src={u.picture} alt={u.name} referrerPolicy="no-referrer" className="admin-table-avatar" />}
+                          <span>{u.name}</span>
+                        </div>
+                      </td>
+                      <td className="admin-table-email">{u.email}</td>
+                      <td className="admin-table-num">{u.visit_count}</td>
+                      <td className="admin-table-date">{fmtDate(u.first_seen)}</td>
+                      <td className="admin-table-date">{fmtDate(u.last_seen)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
 
         <section className="admin-section">
