@@ -126,18 +126,25 @@ function App() {
       const np = { name: p.name, country: p.country, lat: p.lat, lon: p.lon, coords: fmtCoords(p.lat, p.lon) };
       setPlace(np); loadFood(np);
     }
+    const sc = parseInt(localStorage.getItem("dr_searches") || "0", 10);
+    localStorage.setItem("dr_searches", String(sc + 1));
   };
 
   uE(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
 
-  const signOut = () => { localStorage.removeItem("dr_user"); setUser(null); };
+  const signOut = () => { localStorage.removeItem("dr_user"); localStorage.removeItem("dr_searches"); setUser(null); };
 
   if (!user) return <LoginScreen onLogin={setUser} />;
 
   const isAdmin = user.email === "vedantbhatia8@gmail.com";
+
   if (window.location.pathname === "/admin") {
     if (!isAdmin) { window.location.replace("/"); return null; }
     return <AdminDashboard user={user} onSignOut={signOut} />;
+  }
+
+  if (window.location.pathname === "/account") {
+    return <AccountPage user={user} onSignOut={signOut} />;
   }
 
   return (
@@ -156,10 +163,9 @@ function App() {
             </div>
           </div>
           <SearchBox onSelect={pick} />
-          {isAdmin && <a href="/admin" className="admin-btn" title="Admin dashboard">Admin</a>}
-          <button className="user-badge" onClick={signOut} title={`Sign out (${user.email})`}>
+          <a href="/account" className="user-badge" title="My Account">
             <img src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
-          </button>
+          </a>
         </header>
 
         <WorldMap onPick={pick} selected={place} picking={resolving} />
