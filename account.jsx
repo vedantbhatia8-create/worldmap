@@ -20,6 +20,13 @@ function AccountPage({ user, onSignOut }) {
 
   return (
     <div className="account-page">
+      <MotifGrid />
+      <MotifStars />
+      <div className="am am-compass"><MotifCompass style={{width:160,height:160}} /></div>
+      <div className="am am-ship"><MotifShip style={{width:200,height:110}} /></div>
+      <div className="am am-balloon"><MotifBalloon style={{width:80,height:136}} /></div>
+      <div className="am am-palm"><MotifPalm style={{width:105,height:138}} /></div>
+
       <header className="account-topbar">
         <a href="/" className="account-back">← Back to Map</a>
         <span className="account-topbar-title">My Account</span>

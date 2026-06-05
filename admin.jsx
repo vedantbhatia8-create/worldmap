@@ -58,6 +58,11 @@ function AdminDashboard({ user, onSignOut }) {
 
   return (
     <div className="admin-page">
+      <MotifGrid />
+      <div className="adm adm-compass"><MotifCompass style={{width:150,height:150}} /></div>
+      <div className="adm adm-anchor"><MotifAnchor style={{width:62,height:86}} /></div>
+      <div className="adm adm-scope"><MotifScope style={{width:90,height:80}} /></div>
+
       <header className="admin-topbar">
         <div className="brand">
           <div className="brand-mark" aria-hidden="true">
