@@ -33,30 +33,36 @@ async function fromGemini(place) {
     `Reply with ONLY a raw JSON array of 10 objects, no prose:\n` +
     `{"name":"string","category":"2-3 word type","rating":4.6,"price":2,"distance":"1.2 km","blurb":"max 12 words"}\n` +
     `rating: 3.8-5.0, price: 1-4 (1=cheap, 4=fine dining), distance from city centre.`;
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 1024 } }),
-    }
-  );
-  const data = await r.json();
-  if (!r.ok || data.error) {
-    throw new Error(data.error?.message || `Gemini error ${r.status}`);
+  const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 1024 } });
+  const key = process.env.GEMINI_API_KEY;
+
+  // Try models in order until one responds successfully.
+  const endpoints = [
+    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${key}`,
+  ];
+
+  let lastErr = "All Gemini endpoints failed";
+  for (const url of endpoints) {
+    const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+    const data = await r.json();
+    if (!r.ok || data.error) { lastErr = data.error?.message || `HTTP ${r.status}`; continue; }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const list = safeParseJSON(text);
+    if (!Array.isArray(list)) { lastErr = "Gemini returned unexpected format"; continue; }
+    return list.slice(0, 10).map((it, i) => ({
+      rank: i + 1,
+      name: String(it.name || ""),
+      category: String(it.category || "Restaurant"),
+      rating: Math.max(3.5, Math.min(5, Number(it.rating) || 4.3)),
+      price: Math.max(1, Math.min(4, Math.round(Number(it.price) || 2))),
+      distance: String(it.distance || ""),
+      blurb: String(it.blurb || ""),
+    }));
   }
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  let list = safeParseJSON(text);
-  if (!Array.isArray(list)) return [];
-  return list.slice(0, 10).map((it, i) => ({
-    rank: i + 1,
-    name: String(it.name || ""),
-    category: String(it.category || "Restaurant"),
-    rating: Math.max(3.5, Math.min(5, Number(it.rating) || 4.3)),
-    price: Math.max(1, Math.min(4, Math.round(Number(it.price) || 2))),
-    distance: String(it.distance || ""),
-    blurb: String(it.blurb || ""),
-  }));
+  throw new Error(lastErr);
 }
 
 module.exports = async function handler(req, res) {
