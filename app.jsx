@@ -176,7 +176,7 @@ function App() {
         {toast && <div className="toast">{toast}</div>}
       </div>
 
-      <ResultsPanel place={place} data={data} loading={loading} onClose={() => setPlace(null)} />
+      <ResultsPanel place={place} data={data} loading={loading} onClose={() => setPlace(null)} user={user} />
     </div>
   );
 }

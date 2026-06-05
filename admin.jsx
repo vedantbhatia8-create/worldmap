@@ -1,27 +1,44 @@
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
 const { useState: uS, useEffect: uE } = React;
 
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso), diff = Date.now() - d;
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
 function AdminDashboard({ user, onSignOut }) {
   const [users, setUsers] = uS(null);
+  const [reviews, setReviews] = uS(null);
+  const [banning, setBanning] = uS({});
 
   uE(() => {
-    fetch("/api/users")
-      .then(r => r.json())
-      .then(setUsers)
-      .catch(() => setUsers([]));
+    Promise.all([
+      fetch("/api/users").then(r => r.json()).catch(() => []),
+      fetch("/api/reviews").then(r => r.json()).catch(() => []),
+    ]).then(([u, r]) => { setUsers(Array.isArray(u) ? u : []); setReviews(Array.isArray(r) ? r : []); });
   }, []);
 
-  const cards = [
-    { ic: "🌍", title: "Destinations", stat: "Live", desc: "Photon geocoding + Nominatim reverse lookup" },
-    { ic: "🍽", title: "Food Recs", stat: "AI-Powered", desc: "Llama 3.1 via Groq API (with Yelp fallback)" },
-    { ic: "🔐", title: "Auth", stat: "Active", desc: "Google Identity Services OAuth 2.0" },
-    { ic: "🗺", title: "Map Tiles", stat: "Live", desc: "Esri National Geographic + Leaflet.js" },
-  ];
+  const toggleBan = async (email, isBanned) => {
+    setBanning(b => ({ ...b, [email]: true }));
+    try {
+      await fetch("/api/ban", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, banned: !isBanned }),
+      });
+      setUsers(u => u.map(usr => usr.email === email ? { ...usr, banned: !isBanned } : usr));
+    } finally {
+      setBanning(b => ({ ...b, [email]: false }));
+    }
+  };
 
-  function fmtDate(iso) {
-    if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  }
+  const totalUsers = users?.length ?? "—";
+  const bannedCount = users?.filter(u => u.banned).length ?? "—";
+  const reviewCount = reviews?.length ?? "—";
 
   return (
     <div className="admin-page">
@@ -34,96 +51,119 @@ function AdminDashboard({ user, onSignOut }) {
           </div>
           <div className="brand-txt">
             <div className="brand-name">Destination Relaxation</div>
-            <div className="brand-tag">Admin Control Center</div>
+            <div className="brand-tag">Admin</div>
           </div>
         </div>
         <div className="admin-topbar-right">
           <a href="/" className="admin-back-btn">← Back to Map</a>
-          <button className="user-badge" onClick={onSignOut} title={`Sign out (${user.email})`}>
+          <button className="user-badge" onClick={onSignOut} title="Sign out">
             <img src={user.picture} alt={user.name} referrerPolicy="no-referrer" />
           </button>
         </div>
       </header>
 
-      <main className="admin-main">
-        <div className="admin-hero">
-          <div className="admin-hero-tag">Administrator</div>
-          <h1 className="admin-hero-title">Control Center</h1>
-          <p className="admin-hero-sub">Welcome back, {user.name.split(" ")[0]}.</p>
-        </div>
-
-        <section className="admin-section">
-          <h2 className="admin-section-title">System Status</h2>
-          <div className="admin-grid">
-            {cards.map((c) => (
-              <div key={c.title} className="admin-card">
-                <div className="admin-card-ic">{c.ic}</div>
-                <div className="admin-card-body">
-                  <h3>{c.title}</h3>
-                  <div className="admin-stat">{c.stat}</div>
-                  <p>{c.desc}</p>
-                </div>
-              </div>
-            ))}
+      <div className="admin-scroll">
+        <main className="admin-main">
+          <div className="admin-hero">
+            <div className="admin-hero-tag">Admin Panel</div>
+            <h1 className="admin-hero-title">Dashboard</h1>
+            <p className="admin-hero-sub">Welcome back, {user.name.split(" ")[0]}.</p>
           </div>
-        </section>
 
-        <section className="admin-section">
-          <h2 className="admin-section-title">
-            Users
-            {users && <span className="admin-user-count">{users.length} total</span>}
-          </h2>
-          {!users && <div className="admin-loading">Loading users…</div>}
-          {users && users.length === 0 && (
-            <div className="admin-empty">No users yet — sign in on the map to populate this table.</div>
-          )}
-          {users && users.length > 0 && (
-            <div className="admin-table-wrap">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>User</th>
-                    <th>Email</th>
-                    <th>Visits</th>
-                    <th>First seen</th>
-                    <th>Last seen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((u) => (
-                    <tr key={u.email}>
-                      <td>
-                        <div className="admin-table-user">
-                          {u.picture && <img src={u.picture} alt={u.name} referrerPolicy="no-referrer" className="admin-table-avatar" />}
-                          <span>{u.name}</span>
-                        </div>
-                      </td>
-                      <td className="admin-table-email">{u.email}</td>
-                      <td className="admin-table-num">{u.visit_count}</td>
-                      <td className="admin-table-date">{fmtDate(u.first_seen)}</td>
-                      <td className="admin-table-date">{fmtDate(u.last_seen)}</td>
+          <div className="admin-stats">
+            <div className="admin-stat-card">
+              <div className="asc-num">{totalUsers}</div>
+              <div className="asc-label">Total Users</div>
+            </div>
+            <div className="admin-stat-card">
+              <div className={"asc-num" + (bannedCount > 0 ? " asc-red" : "")}>{bannedCount}</div>
+              <div className="asc-label">Banned</div>
+            </div>
+            <div className="admin-stat-card">
+              <div className="asc-num">{reviewCount}</div>
+              <div className="asc-label">Reviews</div>
+            </div>
+          </div>
+
+          <section className="admin-section">
+            <h2 className="admin-section-title">Users</h2>
+            {!users && <div className="admin-loading">Loading users…</div>}
+            {users && users.length === 0 && (
+              <p className="admin-empty">No users yet. Sign in on the map to populate this.</p>
+            )}
+            {users && users.length > 0 && (
+              <div className="admin-table-wrap">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>User</th>
+                      <th>Email</th>
+                      <th>Visits</th>
+                      <th>Last Login</th>
+                      <th>Status</th>
+                      <th></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="admin-section">
-          <h2 className="admin-section-title">Your Account</h2>
-          <div className="admin-profile">
-            <img src={user.picture} alt={user.name} referrerPolicy="no-referrer" className="admin-avatar" />
-            <div className="admin-profile-info">
-              <div className="admin-profile-name">{user.name}</div>
-              <div className="admin-profile-email">{user.email}</div>
-              <div className="admin-profile-role">
-                <span className="admin-role-badge">Administrator</span>
+                  </thead>
+                  <tbody>
+                    {users.map(u => (
+                      <tr key={u.email} className={u.banned ? "row-banned" : ""}>
+                        <td>
+                          <div className="admin-table-user">
+                            {u.picture && <img src={u.picture} alt="" referrerPolicy="no-referrer" className="admin-table-avatar" />}
+                            <span className="admin-table-name">{u.name}</span>
+                          </div>
+                        </td>
+                        <td className="admin-table-email">{u.email}</td>
+                        <td className="admin-table-num">{u.visit_count ?? 1}</td>
+                        <td className="admin-table-date">{fmtDate(u.last_seen)}</td>
+                        <td>
+                          <span className={"admin-status-badge " + (u.banned ? "banned" : "active")}>
+                            {u.banned ? "Banned" : "Active"}
+                          </span>
+                        </td>
+                        <td>
+                          {u.email !== "vedantbhatia8@gmail.com" && (
+                            <button
+                              className={"admin-ban-btn" + (u.banned ? " unban" : "")}
+                              onClick={() => toggleBan(u.email, u.banned)}
+                              disabled={!!banning[u.email]}
+                            >
+                              {banning[u.email] ? "…" : u.banned ? "Unban" : "Ban"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </div>
-        </section>
-      </main>
+            )}
+          </section>
+
+          <section className="admin-section">
+            <h2 className="admin-section-title">Recent Reviews</h2>
+            {!reviews && <div className="admin-loading">Loading reviews…</div>}
+            {reviews && reviews.length === 0 && (
+              <p className="admin-empty">No reviews yet.</p>
+            )}
+            {reviews && reviews.length > 0 && (
+              <div className="admin-reviews">
+                {reviews.slice(0, 30).map(r => (
+                  <div key={r.id} className="admin-review-item">
+                    <div className="ari-header">
+                      <span className="ari-place">{r.place_name}</span>
+                      <span className="ari-stars">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
+                      <span className="ari-date">{fmtDate(r.created_at)}</span>
+                    </div>
+                    {r.review_text && <p className="ari-text">"{r.review_text}"</p>}
+                    <div className="ari-user">— {r.user_name} · {r.user_email}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </main>
+      </div>
     </div>
   );
 }

@@ -182,16 +182,22 @@ function LoginScreen({ onLogin }) {
         }
         google.accounts.id.initialize({
           client_id: googleClientId,
-          callback: ({ credential }) => {
+          callback: async ({ credential }) => {
             const payload = parseJwt(credential);
             if (!payload) { setError("Sign-in failed. Please try again."); return; }
             const user = { name: payload.name, email: payload.email, picture: payload.picture };
+            try {
+              const resp = await fetch("/api/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(user),
+              }).then(r => r.json());
+              if (resp.banned) {
+                setError("Your account has been suspended. Contact the administrator.");
+                return;
+              }
+            } catch { /* don't block login if tracking fails */ }
             localStorage.setItem("dr_user", JSON.stringify(user));
-            fetch("/api/login", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(user),
-            }).catch(() => {});
             onLogin(user);
           },
           ux_mode: "popup",

@@ -1,4 +1,5 @@
 // ── Results side panel ───────────────────────────────────────────────────────
+const { useState: uS, useEffect: uE } = React;
 
 function Stars({ value }) {
   const pct = (value / 5) * 100;
@@ -80,7 +81,102 @@ function SkeletonItem() {
   );
 }
 
-function ResultsPanel({ place, data, loading, onClose }) {
+function fmtReviewDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso), diff = Date.now() - d;
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function ReviewSection({ place, user }) {
+  const [reviews, setReviews] = uS(null);
+  const [hov, setHov] = uS(0);
+  const [sel, setSel] = uS(0);
+  const [text, setText] = uS("");
+  const [busy, setBusy] = uS(false);
+  const [done, setDone] = uS(false);
+
+  uE(() => {
+    if (!place) return;
+    setReviews(null); setDone(false); setSel(0); setText("");
+    fetch(`/api/reviews?place=${encodeURIComponent(place.name)}`)
+      .then(r => r.json()).then(setReviews).catch(() => setReviews([]));
+  }, [place?.name]);
+
+  const submit = async () => {
+    if (!sel || busy) return;
+    setBusy(true);
+    try {
+      await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          place_name: place.name, place_country: place.country,
+          user_email: user.email, user_name: user.name,
+          rating: sel, review_text: text.trim(),
+        }),
+      });
+      setDone(true); setSel(0); setText("");
+      const fresh = await fetch(`/api/reviews?place=${encodeURIComponent(place.name)}`).then(r => r.json());
+      setReviews(fresh);
+    } finally { setBusy(false); }
+  };
+
+  const active = hov || sel;
+
+  return (
+    <div className="review-section">
+      <div className="review-section-title">Community Reviews</div>
+
+      {reviews && reviews.length > 0 && (
+        <div className="review-list">
+          {reviews.map(r => (
+            <div key={r.id} className="review-item">
+              <div className="ri-header">
+                <span className="ri-stars">{"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)}</span>
+                <span className="ri-user">{r.user_name}</span>
+                <span className="ri-date">{fmtReviewDate(r.created_at)}</span>
+              </div>
+              {r.review_text && <p className="ri-text">{r.review_text}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+      {reviews && reviews.length === 0 && (
+        <p className="review-empty">No reviews yet — be the first!</p>
+      )}
+
+      {!done ? (
+        <div className="review-form">
+          <div className="rf-label">Leave a review</div>
+          <div className="rf-stars">
+            {[1, 2, 3, 4, 5].map(n => (
+              <button key={n} className={"rf-star" + (n <= active ? " lit" : "")}
+                onMouseEnter={() => setHov(n)} onMouseLeave={() => setHov(0)}
+                onClick={() => setSel(n)}>★</button>
+            ))}
+          </div>
+          {sel > 0 && (
+            <>
+              <textarea className="rf-text" placeholder="Share your experience… (optional)"
+                value={text} onChange={e => setText(e.target.value)} rows={3} />
+              <button className="rf-submit" onClick={submit} disabled={busy}>
+                {busy ? "Submitting…" : "Submit Review"}
+              </button>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="review-thanks">Thanks for your review! ✦</div>
+      )}
+    </div>
+  );
+}
+
+function ResultsPanel({ place, data, loading, onClose, user }) {
   const open = !!place;
   return (
     <aside className={"panel" + (open ? " open" : "")}>
@@ -105,6 +201,8 @@ function ResultsPanel({ place, data, loading, onClose }) {
             {!loading && data && data.length > 0 && (
               <div className="panel-foot">Top restaurants &amp; bars in {place.name}</div>
             )}
+
+            {user && <ReviewSection place={place} user={user} />}
           </div>
         </div>
       )}

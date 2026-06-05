@@ -29,10 +29,11 @@ async function fromYelp(place) {
 
 async function fromGroq(place) {
   const prompt =
-    `For "${place}", list the 10 best restaurants, cafes, bars and food spots.\n` +
-    `Reply with ONLY a raw JSON array of 10 objects, no prose:\n` +
-    `{"name":"string","category":"2-3 word type","rating":4.6,"price":2,"distance":"1.2 km","blurb":"max 12 words"}\n` +
-    `rating: 3.8-5.0, price: 1-4 (1=cheap, 4=fine dining), distance from city centre.`;
+    `List the best restaurants, cafes, bars and food spots physically located WITHIN the city of "${place}".\n` +
+    `CRITICAL: Only include places inside "${place}" city limits. Do NOT include anything from neighboring cities, suburbs, or surrounding areas. If fewer than 10 good options exist within the city, return only those.\n` +
+    `Reply with ONLY a raw JSON array (up to 10 objects), no prose:\n` +
+    `{"name":"string","category":"2-3 word type","rating":4.6,"price":2,"distance":"1.2 km from city center","blurb":"max 12 words"}\n` +
+    `rating: 3.8-5.0, price: 1-4 (1=cheap, 4=fine dining).`;
 
   const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
