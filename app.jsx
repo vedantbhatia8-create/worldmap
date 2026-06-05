@@ -1,4 +1,4 @@
-// ── App: state, data loading, search, AI wiring ──────────────────────────────
+// ── App: state, data loading, search ─────────────────────────────────────────
 const { useState: uS, useEffect: uE, useRef: uR } = React;
 
 function fmtCoords(lat, lon) {
@@ -83,40 +83,43 @@ function SearchBox({ onSelect }) {
 function App() {
   const [place, setPlace] = uS(null);
   const [data, setData] = uS(null);
-  const [loading, setLoading] = uS({ food: false, attractions: false });
-  const [tab, setTab] = uS("food");
+  const [loading, setLoading] = uS(false);
   const [resolving, setResolving] = uS(false);
   const [toast, setToast] = uS(null);
   const reqId = uR(0);
 
-  const loadLists = async (placeObj) => {
+  const loadFood = async (placeObj) => {
     const id = ++reqId.current;
-    setData({ food: null, attractions: null });
-    setLoading({ food: true, attractions: true });
-    const label = `${placeObj.name}, ${placeObj.country}`;
-    const settle = (kind, val) => {
+    setData(null);
+    setLoading(true);
+    try {
+      const r = await fetch("/api/food", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ place: `${placeObj.name}, ${placeObj.country}` }),
+      });
       if (id !== reqId.current) return;
-      setData((d) => ({ ...(d || {}), [kind]: val }));
-      setLoading((l) => ({ ...l, [kind]: false }));
-    };
-    window.DRAI.generateList(label, "food").then((v) => settle("food", v))
-      .catch(() => { settle("food", []); setToast("Couldn't reach the guide service."); });
-    window.DRAI.generateList(label, "attractions").then((v) => settle("attractions", v))
-      .catch(() => settle("attractions", []));
+      setData(await r.json());
+    } catch {
+      if (id !== reqId.current) return;
+      setData([]);
+      setToast("Couldn't load recommendations.");
+    } finally {
+      if (id === reqId.current) setLoading(false);
+    }
   };
 
   const pick = async (p) => {
-    setTab("food");
     if (p.source === "map" && !p.name) {
       setResolving(true);
       const found = await window.DRAI.identifyPlace(p.lat, p.lon);
       setResolving(false);
       if (!found || found.sea) { setToast("That looks like open water — try clicking on land."); return; }
       const np = { name: found.name, country: found.country, lat: p.lat, lon: p.lon, coords: fmtCoords(p.lat, p.lon) };
-      setPlace(np); loadLists(np);
+      setPlace(np); loadFood(np);
     } else {
       const np = { name: p.name, country: p.country, lat: p.lat, lon: p.lon, coords: fmtCoords(p.lat, p.lon) };
-      setPlace(np); loadLists(np);
+      setPlace(np); loadFood(np);
     }
   };
 
@@ -154,7 +157,7 @@ function App() {
         {toast && <div className="toast">{toast}</div>}
       </div>
 
-      <ResultsPanel place={place} data={data} loading={loading} tab={tab} setTab={setTab} onClose={() => setPlace(null)} />
+      <ResultsPanel place={place} data={data} loading={loading} onClose={() => setPlace(null)} />
     </div>
   );
 }

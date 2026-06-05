@@ -1,4 +1,4 @@
-// ── Results side panel: Food / Attractions tabs ──────────────────────────────
+// ── Results side panel ───────────────────────────────────────────────────────
 
 function Stars({ value }) {
   const pct = (value / 5) * 100;
@@ -21,51 +21,43 @@ function Stars({ value }) {
   );
 }
 
-function PriceLevel({ value, kind }) {
-  if (kind === "attractions" && value === 0) return <span className="price free">Free</span>;
-  const max = kind === "food" ? 4 : 3;
-  const sym = kind === "food" ? "$" : "€";
+function PriceLevel({ value }) {
   return (
     <span className="price">
-      <b>{sym.repeat(Math.max(1, value))}</b>
-      <span className="price-dim">{sym.repeat(Math.max(0, max - Math.max(1, value)))}</span>
+      <b>{"$".repeat(Math.max(1, value))}</b>
+      <span className="price-dim">{"$".repeat(Math.max(0, 4 - Math.max(1, value)))}</span>
     </span>
   );
 }
 
 const FOOD_ICON = "M7 2v8M5 2v4a2 2 0 002 2M9 2v4a2 2 0 01-2 2M15 2c-1.5 0-2 2-2 4s.5 3 2 3v9M7 13v9";
-const ATTR_ICON = "M3 21h18M5 21V9l7-5 7 5v12M9 21v-6h6v6";
 
-function Thumb({ item, kind }) {
-  // Deterministic colourful tint from the name.
+function Thumb({ item }) {
   let h = 0; for (const ch of item.name) h = (h * 31 + ch.charCodeAt(0)) % 360;
-  const base = kind === "food" ? [10, 200] : [150, 260]; // warm band for food, cool for sights
-  const hue = base[0] + (h % (base[1] - base[0]));
+  const hue = 10 + (h % 190);
   const c1 = `hsl(${hue} 64% 56%)`, c2 = `hsl(${(hue + 28) % 360} 58% 38%)`;
   return (
     <div className="thumb" style={{ background: `linear-gradient(150deg, ${c1}, ${c2})` }}>
       <svg viewBox="0 0 24 24" className="thumb-ic" fill="none" stroke="rgba(255,255,255,.85)"
         strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-        <path d={kind === "food" ? FOOD_ICON : ATTR_ICON} />
+        <path d={FOOD_ICON} />
       </svg>
       <span className="thumb-rank">{item.rank}</span>
     </div>
   );
 }
 
-function ResultItem({ item, kind }) {
+function ResultItem({ item }) {
   return (
     <li className="ritem">
-      <Thumb item={item} kind={kind} />
+      <Thumb item={item} />
       <div className="ritem-body">
-        <div className="ritem-top">
-          <h4 className="ritem-name">{item.name}</h4>
-        </div>
+        <h4 className="ritem-name">{item.name}</h4>
         <div className="ritem-cat">{item.category}</div>
         <div className="ritem-meta">
           <Stars value={item.rating} />
           <span className="dot-sep">·</span>
-          <PriceLevel value={item.price} kind={kind} />
+          <PriceLevel value={item.price} />
           {item.distance && (<><span className="dot-sep">·</span><span className="dist">{item.distance}</span></>)}
         </div>
         {item.blurb && <p className="ritem-blurb">{item.blurb}</p>}
@@ -88,9 +80,8 @@ function SkeletonItem() {
   );
 }
 
-function ResultsPanel({ place, data, loading, tab, setTab, onClose }) {
+function ResultsPanel({ place, data, loading, onClose }) {
   const open = !!place;
-  const list = data ? data[tab] : null;
   return (
     <aside className={"panel" + (open ? " open" : "")}>
       {place && (
@@ -102,28 +93,17 @@ function ResultsPanel({ place, data, loading, tab, setTab, onClose }) {
             <div className="panel-sub">{place.country}{place.coords ? ` · ${place.coords}` : ""}</div>
           </div>
 
-          <div className="tabs" role="tablist">
-            <button className={"tab" + (tab === "food" ? " active" : "")} onClick={() => setTab("food")}>
-              <span className="tab-label">Food &amp; Drink</span>
-              <span className="tab-rule food" />
-            </button>
-            <button className={"tab" + (tab === "attractions" ? " active" : "")} onClick={() => setTab("attractions")}>
-              <span className="tab-label">Attractions</span>
-              <span className="tab-rule attr" />
-            </button>
-          </div>
-
           <div className="panel-scroll">
-            <div className="list-cap">Top 10 · {tab === "food" ? "where to eat & drink" : "what to see & do"}</div>
+            <div className="list-cap">Top 10 · where to eat &amp; drink</div>
             <ol className="rlist">
-              {loading[tab] && Array.from({ length: 7 }).map((_, i) => <SkeletonItem key={i} />)}
-              {!loading[tab] && list && list.map((it) => <ResultItem key={it.rank} item={it} kind={tab} />)}
-              {!loading[tab] && list && list.length === 0 && (
-                <div className="panel-empty">Couldn’t gather a list for this spot — try another nearby place.</div>
+              {loading && Array.from({ length: 7 }).map((_, i) => <SkeletonItem key={i} />)}
+              {!loading && data && data.map((it) => <ResultItem key={it.rank} item={it} />)}
+              {!loading && data && data.length === 0 && (
+                <div className="panel-empty">No results found — try a larger nearby city.</div>
               )}
             </ol>
-            {!loading[tab] && list && list.length > 0 && (
-              <div className="panel-foot">Curated live for {place.name} · ratings are indicative</div>
+            {!loading && data && data.length > 0 && (
+              <div className="panel-foot">Top restaurants &amp; bars in {place.name}</div>
             )}
           </div>
         </div>
