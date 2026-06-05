@@ -37,25 +37,32 @@ async function fromAI(place) {
   let r, data;
 
   if (process.env.OPENROUTER_API_KEY) {
-    r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://destination-relaxation.vercel.app",
-      },
-      body: JSON.stringify({
-        model: "meta-llama/llama-3.1-8b-instruct:free",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 1024,
-      }),
-    });
-    data = await r.json();
-    if (!r.ok || data.error) throw new Error(data.error?.message || `OpenRouter error ${r.status}`);
-    const text = data.choices?.[0]?.message?.content || "";
-    const list = safeParseJSON(text);
-    if (Array.isArray(list)) return normalise(list);
-    throw new Error("AI returned unexpected format");
+    const freeModels = [
+      "google/gemma-2-9b-it:free",
+      "meta-llama/llama-3.2-3b-instruct:free",
+      "mistralai/mistral-7b-instruct:free",
+      "qwen/qwen-2-7b-instruct:free",
+      "meta-llama/llama-3.1-8b-instruct:free",
+    ];
+    let lastErr = "";
+    for (const model of freeModels) {
+      r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "HTTP-Referer": "https://destination-relaxation.vercel.app",
+        },
+        body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 1024 }),
+      });
+      data = await r.json();
+      if (!r.ok || data.error) { lastErr = data.error?.message || `HTTP ${r.status}`; continue; }
+      const text = data.choices?.[0]?.message?.content || "";
+      const list = safeParseJSON(text);
+      if (Array.isArray(list)) return normalise(list);
+      lastErr = "Unexpected format from " + model;
+    }
+    throw new Error(lastErr || "All OpenRouter models failed");
   }
 
   throw new Error("No AI API key configured. Add OPENROUTER_API_KEY in Vercel environment variables.");
