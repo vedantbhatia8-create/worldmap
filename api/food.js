@@ -27,46 +27,50 @@ async function fromYelp(place) {
   }));
 }
 
-async function fromGemini(place) {
+async function fromAI(place) {
   const prompt =
     `For "${place}", list the 10 best restaurants, cafes, bars and food spots.\n` +
     `Reply with ONLY a raw JSON array of 10 objects, no prose:\n` +
     `{"name":"string","category":"2-3 word type","rating":4.6,"price":2,"distance":"1.2 km","blurb":"max 12 words"}\n` +
     `rating: 3.8-5.0, price: 1-4 (1=cheap, 4=fine dining), distance from city centre.`;
-  const body = JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: 1024 } });
-  const key = process.env.GEMINI_API_KEY;
 
-  // Try bearer-token auth (newer AQ. keys) then query-param auth (classic AIza keys),
-  // across multiple models, until one responds successfully.
-  const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-pro"];
-  const attempts = [
-    ...models.map(m => ({ url: `https://generativelanguage.googleapis.com/v1/models/${m}:generateContent`, auth: "bearer" })),
-    ...models.map(m => ({ url: `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, auth: "bearer" })),
-    ...models.map(m => ({ url: `https://generativelanguage.googleapis.com/v1/models/${m}:generateContent?key=${key}`, auth: "param" })),
-    ...models.map(m => ({ url: `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${key}`, auth: "param" })),
-  ];
+  let r, data;
 
-  let lastErr = "All Gemini endpoints failed";
-  for (const { url, auth } of attempts) {
-    const headers = { "Content-Type": "application/json" };
-    if (auth === "bearer") headers["Authorization"] = `Bearer ${key}`;
-    const r = await fetch(url, { method: "POST", headers, body });
-    const data = await r.json();
-    if (!r.ok || data.error) { lastErr = data.error?.message || `HTTP ${r.status}`; continue; }
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  if (process.env.OPENROUTER_API_KEY) {
+    r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "https://destination-relaxation.vercel.app",
+      },
+      body: JSON.stringify({
+        model: "meta-llama/llama-3.1-8b-instruct:free",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 1024,
+      }),
+    });
+    data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error?.message || `OpenRouter error ${r.status}`);
+    const text = data.choices?.[0]?.message?.content || "";
     const list = safeParseJSON(text);
-    if (!Array.isArray(list)) { lastErr = "Gemini returned unexpected format"; continue; }
-    return list.slice(0, 10).map((it, i) => ({
-      rank: i + 1,
-      name: String(it.name || ""),
-      category: String(it.category || "Restaurant"),
-      rating: Math.max(3.5, Math.min(5, Number(it.rating) || 4.3)),
-      price: Math.max(1, Math.min(4, Math.round(Number(it.price) || 2))),
-      distance: String(it.distance || ""),
-      blurb: String(it.blurb || ""),
-    }));
+    if (Array.isArray(list)) return normalise(list);
+    throw new Error("AI returned unexpected format");
   }
-  throw new Error(lastErr);
+
+  throw new Error("No AI API key configured. Add OPENROUTER_API_KEY in Vercel environment variables.");
+}
+
+function normalise(list) {
+  return list.slice(0, 10).map((it, i) => ({
+    rank: i + 1,
+    name: String(it.name || ""),
+    category: String(it.category || "Restaurant"),
+    rating: Math.max(3.5, Math.min(5, Number(it.rating) || 4.3)),
+    price: Math.max(1, Math.min(4, Math.round(Number(it.price) || 2))),
+    distance: String(it.distance || ""),
+    blurb: String(it.blurb || ""),
+  }));
 }
 
 module.exports = async function handler(req, res) {
@@ -79,11 +83,7 @@ module.exports = async function handler(req, res) {
       const list = await fromYelp(place);
       if (list.length >= 3) return res.json(list);
     }
-    if (process.env.GEMINI_API_KEY) {
-      const list = await fromGemini(place);
-      return res.json(list);
-    }
-    res.status(500).json({ error: "No API key configured (GEMINI_API_KEY missing)" });
+    return res.json(await fromAI(place));
   } catch (err) {
     console.error("Food API error:", err.message);
     res.status(500).json({ error: err.message });
