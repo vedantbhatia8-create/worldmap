@@ -34,7 +34,7 @@ async function fromGemini(place) {
     `{"name":"string","category":"2-3 word type","rating":4.6,"price":2,"distance":"1.2 km","blurb":"max 12 words"}\n` +
     `rating: 3.8-5.0, price: 1-4 (1=cheap, 4=fine dining), distance from city centre.`;
   const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -42,6 +42,9 @@ async function fromGemini(place) {
     }
   );
   const data = await r.json();
+  if (!r.ok || data.error) {
+    throw new Error(data.error?.message || `Gemini error ${r.status}`);
+  }
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
   let list = safeParseJSON(text);
   if (!Array.isArray(list)) return [];
@@ -62,7 +65,6 @@ module.exports = async function handler(req, res) {
   if (!place) return res.status(400).json({ error: "place required" });
 
   try {
-    // Try Yelp first; fall back to Gemini if no results or no key.
     if (process.env.YELP_API_KEY) {
       const list = await fromYelp(place);
       if (list.length >= 3) return res.json(list);
@@ -71,7 +73,7 @@ module.exports = async function handler(req, res) {
       const list = await fromGemini(place);
       return res.json(list);
     }
-    res.json([]);
+    res.status(500).json({ error: "No API key configured (GEMINI_API_KEY missing)" });
   } catch (err) {
     console.error("Food API error:", err.message);
     res.status(500).json({ error: err.message });

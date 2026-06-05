@@ -99,11 +99,13 @@ function App() {
         body: JSON.stringify({ place: `${placeObj.name}, ${placeObj.country}` }),
       });
       if (id !== reqId.current) return;
-      setData(await r.json());
-    } catch {
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error || "Server error");
+      setData(body);
+    } catch (err) {
       if (id !== reqId.current) return;
       setData([]);
-      setToast("Couldn't load recommendations.");
+      setToast(err.message || "Couldn't load recommendations.");
     } finally {
       if (id === reqId.current) setLoading(false);
     }
